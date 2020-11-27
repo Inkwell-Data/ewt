@@ -1,6 +1,32 @@
 -module(ewt).
 -include("ewt.hrl").
 -define(TYPE, 'EWT').
+-define(HMAC_VSN_OLD, hmac_vsn_old).
+-define(HMAC_VSN_NEW23, hmac_vsn_new23).
+-define(HMAC_VSN_AUTO, hmac_vsn_auto).
+-compile({nowarn_removed, [{crypto, hmac, 3}]}).
+-compile({nowarn_deprecated_function, [{crypto, hmac, 3}]}).
+
+
+-ifdef(RUNTIME_OTP_VSN).
+-define(HMAC_VSN, ?HMAC_VSN_AUTO).
+-else.
+
+-ifdef(OTP_RELEASE).
+	-if(?OTP_RELEASE >= 23).
+		-define(HMAC_VSN, ?HMAC_VSN_NEW23).
+	-else.
+		-define(HMAC_VSN, ?HMAC_VSN_OLD).
+	-endif.
+
+-else.
+	-define(HMAC_VSN, ?HMAC_VSN_OLD).
+-endif.
+
+-endif.
+
+-include_lib("eunit/include/eunit.hrl").
+
 
 -export([token/4, claims/2, token_dated/4, claims_dated/2]).
 
@@ -60,7 +86,7 @@ sign(?TYPE, Alg, Header, Claims, Key) ->
 	Payload = payload(Header, Claims),
 	sign(?TYPE, Alg, Payload, Key).
 sign(?TYPE, Alg, Payload, Key) ->
-	base64url:encode(crypto:hmac(Alg, Key, Payload)).
+	base64url:encode(hmac(Alg, Key, Payload)).
 
 payload(Header, Claims) ->
 	<<Header/binary, ".", Claims/binary>>.
@@ -70,3 +96,52 @@ alg(Alg) -> Alg.
 
 exp(auto) -> ?DEFAULT_EXP;
 exp(Exp) -> Exp.
+
+
+
+
+
+hmac(Alg, Key, Payload) ->
+	hmac(?HMAC_VSN, Alg, Key, Payload).
+
+
+hmac(?HMAC_VSN_NEW23, Alg, Key, Payload) ->
+	crypto:mac(hmac, Alg, Key, Payload);
+
+hmac(?HMAC_VSN_OLD, Alg, Key, Payload) ->
+	crypto:hmac(Alg, Key, Payload);
+
+hmac(?HMAC_VSN_AUTO, Alg, Key, Payload) ->
+	OTPRelease = erlang:system_info(otp_release),
+	Vsn = if
+			  OTPRelease >= "23" -> ?HMAC_VSN_NEW23;
+			  true -> ?HMAC_VSN_OLD
+		  end,
+	hmac(Vsn, Alg, Key, Payload).
+
+
+-ifdef(TEST).
+token_test_() ->
+	[
+		?_assert(
+			ewt:token(100000000000, #{user => <<"John Doe">>, roles => [manager, admin]}, <<"sosecret">>, sha256)
+			=:= <<"g3QAAAACZAADYWxnZAAGc2hhMjU2ZAADdHlwZAADRVdU.g3QAAAADZAADZXhwbgUAAOh2SBdkAAVyb2xlc2wAAAACZAAHbWFuYWdlcmQABWFkbWluamQABHVzZXJtAAAACEpvaG4gRG9l.9hBuyowRO6BkCPdt6yd4CPpJ3JovJCONjlrP3gIZOPU">>)
+	].
+
+claims_test_() ->
+	[
+		?_assert(
+			ewt:claims(<<"g3QAAAACZAADYWxnZAAGc2hhMjU2ZAADdHlwZAADRVdU.g3QAAAADZAADZXhwbgUAAOh2SBdkAAVyb2xlc2wAAAACZAAHbWFuYWdlcmQABWFkbWluamQABHVzZXJtAAAACEpvaG4gRG9l.9hBuyowRO6BkCPdt6yd4CPpJ3JovJCONjlrP3gIZOPU">>,
+					   <<"sosecret">>) =:= {ok,#{exp => 100000000000, roles => [manager,admin], user => <<"John Doe">>}}),
+		?_assert(
+			ewt:claims(<<"g3QAAAACZAADYWxnZAAGc2hhMjU2ZAADdHlwZAADRVdU.g3QAAAADZAADZXhwYQBkAAVyb2xlc2wAAAACZAAHbWFuYWdlcmQABWFkbWluamQABHVzZXJtAAAACEpvaG4gRG9l.ItidyKytW_LXpF1jILg0w4LX10KI_wqOYumB1CJ98EU">>,
+					   <<"sosecret">>) =:= expired),
+		?_assert(
+			ewt:claims(<<"invalid_token">>,
+					   <<"sosecret">>) =:= bad),
+		?_assert(
+			ewt:claims(<<"g3QAAAACZAADYWxnZAAGc2hhMjU2ZAADdHlwZAADRVdU.g3QAAAADZAADZXhwbgUAAOh2SBdkAAVyb2xlc2wAAAACZAAHbWFuYWdlcmQABWFkbWluamQABHVzZXJtAAAACEpvaG4gRG9l.9hBuyowRO6BkCPdt6yd4CPpJ3JovJCONjlrP3gIZOPU">>,
+					   <<"notsosecret">>) =:= bad)
+	].
+
+-endif.

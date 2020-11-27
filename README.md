@@ -34,7 +34,13 @@ You may also use atoms auto as Alg and Expiration. In this case Expiration == un
 
 `token_dated` and `claims_dated` functions work with tokens having the fourth part - time of token creation - attached at the beginning 
 of the token. Useful if you store tokens in some storage and batch delete them using something like `delete where token < ...`
-         
+
+## Compatibility with crypto in OTP 23 and newer
+In OTP 23 and newer `crypto:hmac/3` is deprecated and replaced by `crypto:mac/4`. By default ewt tests in  the compile time
+which function it should use with the help of the ?OTP_VERSION macros. If you want to test it in runtime instead define the
+`?RUNTIME_OTP_VSN` macros. In both cases the wrong (too old or too new function) is never called but is still here in the module,
+so it triggers deprecated function warning or removed function warning, Both these warnings are suppressed in the `-compile` attribute.
+
 Using tokens for authorization is dangerous as the security depends on the single "secret key". Unlike salted
  hashes the token won't protect your users in case when the perpetrator got read-only access to your server. So imo
   checking if the actual token has been really issued to the user with ID encoded in the token Claims is an absolutely
