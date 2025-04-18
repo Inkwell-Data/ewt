@@ -8,8 +8,7 @@
 		{applications, [
 			kernel,
 			stdlib,
-			crypto,
-			base64
+			crypto
 		]},
 		{env, []}
 	]}.
