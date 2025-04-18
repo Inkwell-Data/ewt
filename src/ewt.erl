@@ -38,8 +38,8 @@ token(Expiration, Claims_, Key, Alg) ->
 	Claims = Claims_#{exp => exp(Expiration)},
 	Header = #{typ => ?TYPE, alg => alg(Alg)},
 
-	B64Header = base64url:encode(term_to_binary(Header)),
-	B64Claims = base64url:encode(term_to_binary(Claims)),
+	B64Header = base64:encode(term_to_binary(Header)),
+	B64Claims = base64:encode(term_to_binary(Claims)),
 
 	Payload = payload(B64Header, B64Claims),
 
@@ -69,9 +69,9 @@ parse(Token, Key, dated) ->
 
 parse(Token, Key, standard) ->
 	[B64Header, B64Claims, B64Signature] = binary:split(Token, <<".">>, [global]),
-	#{typ := Type, alg := Alg} = binary_to_term(base64url:decode(B64Header), [safe]),
+	#{typ := Type, alg := Alg} = binary_to_term(base64:decode(B64Header), [safe]),
 	true = B64Signature == sign(Type, Alg, B64Header, B64Claims, Key),
-	Claims = binary_to_term(base64url:decode(B64Claims), [safe]),
+	Claims = binary_to_term(base64:decode(B64Claims), [safe]),
 	check_expired(Claims).
 
 
@@ -86,7 +86,7 @@ sign(?TYPE, Alg, Header, Claims, Key) ->
 	Payload = payload(Header, Claims),
 	sign(?TYPE, Alg, Payload, Key).
 sign(?TYPE, Alg, Payload, Key) ->
-	base64url:encode(hmac(Alg, Key, Payload)).
+	base64:encode(hmac(Alg, Key, Payload)).
 
 payload(Header, Claims) ->
 	<<Header/binary, ".", Claims/binary>>.

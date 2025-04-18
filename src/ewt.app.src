@@ -9,7 +9,7 @@
 			kernel,
 			stdlib,
 			crypto,
-			base64url
+			base64
 		]},
 		{env, []}
 	]}.
